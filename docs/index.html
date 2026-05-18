@@ -690,90 +690,11 @@
           <span class="dot-green"></span>
         </div>
         <div class="terminal-title">diskscout.sh</div>
-        <button class="copy-btn" data-target="full-script" onclick="copyText(this)">Copy Script</button>
+        <button class="copy-btn" data-target="full-script-raw" onclick="copyText(this)">Copy Script</button>
       </div>
-      <div class="terminal-body" id="full-script">#!/bin/bash
-# DiskScout &mdash; Find the largest files on your Mac
-# READ-ONLY: This script NEVER deletes, moves, or modifies any files.
-
-set -uo pipefail
-
-COUNT=50
-MIN_SIZE=""
-SEARCH_PATH="/"
-FORMAT="table"
-SHOW_HIDDEN=false
-EXCLUDE_SYSTEM=true
-OPEN_MODE=false
-
-usage() {
-    cat &lt;&lt;'HELP'
-DiskScout &mdash; Find the largest files on your Mac
-
-Usage: diskscout.sh [OPTIONS]
-
-Options:
-  -n NUM        Number of files to show (default: 50)
-  -p PATH       Directory to search (default: / )
-  -m SIZE       Minimum file size filter: 100M, 1G, etc.
-  -a            Include hidden/dot files
-  -s            Include system directories (/System, /Library, etc.)
-  -c            Output as CSV instead of table
-  -o            After results, prompt to reveal any file in Finder
-  -h            Show this help
-
-READ-ONLY &mdash; will NEVER delete, move, or modify any files.
-HELP
-    exit 0
-}
-
-while getopts "n:p:m:ascoh" opt; do
-    case $opt in
-        n) COUNT="$OPTARG" ;;
-        p) SEARCH_PATH="$OPTARG" ;;
-        m) MIN_SIZE="$OPTARG" ;;
-        a) SHOW_HIDDEN=true ;;
-        s) EXCLUDE_SYSTEM=false ;;
-        c) FORMAT="csv" ;;
-        o) OPEN_MODE=true ;;
-        h) usage ;;
-        *) usage ;;
-    esac
-done
-
-APPLE=$(printf '\xEF\xA3\xBF')
-
-if [[ "$FORMAT" == "table" ]] &amp;&amp; [[ -t 1 ]]; then
-    BOLD="\033[1m"; DIM="\033[2m"; CYAN="\033[36m"
-    YELLOW="\033[33m"; RED="\033[31m"; GREEN="\033[32m"
-    BGREEN="\033[92m"; WHITE="\033[97m"; RESET="\033[0m"
-else
-    BOLD="" DIM="" CYAN="" YELLOW="" RED="" GREEN=""
-    BGREEN="" WHITE="" RESET="" APPLE=""
-fi
-
-SIX_MONTHS_AGO=$(date -v-6m +%s 2&gt;/dev/null || echo 0)
-
-human_size() {
-    local bytes=$1
-    if (( bytes &gt;= 1073741824 )); then
-        printf "%.1f GB" "$(echo "scale=1; $bytes / 1073741824" | bc)"
-    elif (( bytes &gt;= 1048576 )); then
-        printf "%.1f MB" "$(echo "scale=1; $bytes / 1048576" | bc)"
-    elif (( bytes &gt;= 1024 )); then
-        printf "%.1f KB" "$(echo "scale=1; $bytes / 1024" | bc)"
-    else
-        printf "%d B" "$bytes"
-    fi
-}
-
-# ... (full classify, time_ago, display logic)
-# Copy from the button above or download via curl</div>
+      <div class="terminal-body" id="full-script-display"></div>
     </div>
-
-    <p style="margin-top: 12px; color: var(--text-dim); font-size: 14px;">
-      The copy button above copies a working summary. For the complete script with all features, use the <strong>Quick Start</strong> curl command or the install steps &mdash; those pull the full version.
-    </p>
+    <textarea id="full-script-raw" style="position:absolute;left:-9999px" aria-hidden="true"></textarea>
   </div>
 
   <!-- ═══════ FAQ ═══════ -->
@@ -813,12 +734,13 @@ human_size() {
 
   <!-- ═══════ SCRIPTS ═══════ -->
   <script>
+    const SCRIPT_URL = 'https://raw.githubusercontent.com/johnrosment/diskscout/main/diskscout.sh';
+
     function copyText(btn) {
       const targetId = btn.getAttribute('data-target');
       const el = document.getElementById(targetId);
-      let text = el.textContent || el.innerText;
+      let text = el.value !== undefined && el.value !== '' ? el.value : (el.textContent || el.innerText);
 
-      // For terminal blocks, strip prompt symbols and keep just commands
       if (targetId === 'install-cmd') {
         text = text.split('\n')
           .filter(line => line.trim().startsWith('$'))
@@ -836,6 +758,22 @@ human_size() {
         }, 2000);
       });
     }
+
+    (async function loadScript() {
+      const display = document.getElementById('full-script-display');
+      const raw = document.getElementById('full-script-raw');
+      display.textContent = 'Loading script...';
+
+      try {
+        const res = await fetch(SCRIPT_URL);
+        if (!res.ok) throw new Error(res.status);
+        const text = await res.text();
+        raw.value = text;
+        display.textContent = text;
+      } catch (e) {
+        display.textContent = 'Could not load script. Use the curl command above to download it directly.';
+      }
+    })();
   </script>
 
 </body>
