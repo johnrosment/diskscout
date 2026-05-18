@@ -11,6 +11,8 @@ FORMAT="table"
 SHOW_HIDDEN=false
 EXCLUDE_SYSTEM=true
 OPEN_MODE=false
+FORCE_SCAN=false
+CACHE_MAX_AGE=3600
 
 usage() {
     cat <<'HELP'
@@ -21,18 +23,20 @@ Usage: diskscout.sh [OPTIONS]
 Options:
   -n NUM        Number of files to show (default: 50)
   -p PATH       Directory to search (default: / )
-  -m SIZE       Minimum file size filter: 100M, 1G, etc.
+  -m SIZE       Minimum file size filter (default: 1M). Use 100M, 1G, etc.
   -a            Include hidden/dot files
   -s            Include system directories (/System, /Library, etc.)
+  -f            Force fresh scan (ignore cache)
   -c            Output as CSV instead of table
   -o            After results, prompt to reveal any file in Finder
   -h            Show this help
 
 Examples:
-  diskscout.sh                     # Top 50 largest files
+  diskscout.sh                     # Top 50 largest files (cached after first run)
   diskscout.sh -n 20 -o            # Top 20, then reveal any in Finder
   diskscout.sh -p ~/Downloads      # Scan just Downloads
   diskscout.sh -m 1G               # Only files >= 1GB
+  diskscout.sh -f                  # Force fresh scan, skip cache
   diskscout.sh -c > report.csv     # Export to CSV
 
 READ-ONLY — will NEVER delete, move, or modify any files.
@@ -40,7 +44,7 @@ HELP
     exit 0
 }
 
-while getopts "n:p:m:ascoh" opt; do
+while getopts "n:p:m:ascofh" opt; do
     case $opt in
         n) COUNT="$OPTARG" ;;
         p) SEARCH_PATH="$OPTARG" ;;
@@ -49,6 +53,7 @@ while getopts "n:p:m:ascoh" opt; do
         s) EXCLUDE_SYSTEM=false ;;
         c) FORMAT="csv" ;;
         o) OPEN_MODE=true ;;
+        f) FORCE_SCAN=true ;;
         h) usage ;;
         *) usage ;;
     esac
@@ -116,6 +121,19 @@ friendly_dir() {
     else
         echo "$dir"
     fi
+}
+
+parse_size_bytes() {
+    local input="$1"
+    local num="${input%[A-Za-z]*}"
+    local unit="${input##*[0-9]}"
+    case "$unit" in
+        [kK]) echo $(( num * 1024 )) ;;
+        [mM]) echo $(( num * 1048576 )) ;;
+        [gG]) echo $(( num * 1073741824 )) ;;
+        [tT]) echo $(( num * 1099511627776 )) ;;
+        *)    echo "$num" ;;
+    esac
 }
 
 # Shorten long filenames: keep start + extension, collapse the middle
@@ -314,9 +332,17 @@ classify() {
     echo "normal|"
 }
 
-# ── Build find arguments ──────────────────────────────────
+# ── Minimum size threshold ────────────────────────────────
 
-FIND_ARGS=("$SEARCH_PATH" -type f)
+if [[ -n "$MIN_SIZE" ]]; then
+    MIN_BYTES=$(parse_size_bytes "$MIN_SIZE")
+else
+    MIN_BYTES=1048576  # Default 1MB — skip tiny files for speed
+fi
+
+# ── Build find arguments (fallback scanner) ───────────────
+
+FIND_ARGS=("$SEARCH_PATH" -type f -size +"${MIN_BYTES}c")
 
 if [[ "$EXCLUDE_SYSTEM" == true ]] && [[ "$SEARCH_PATH" == "/" ]]; then
     FIND_ARGS+=( \
@@ -332,9 +358,25 @@ if [[ "$SHOW_HIDDEN" == false ]]; then
     FIND_ARGS+=(-not -path "*/.*")
 fi
 
-if [[ -n "$MIN_SIZE" ]]; then
-    FIND_ARGS+=(-size +"$MIN_SIZE")
-fi
+# ── Build grep filters for Spotlight results ──────────────
+
+build_grep_filters() {
+    local cmd="cat"
+    if [[ "$EXCLUDE_SYSTEM" == true ]] && [[ "$SEARCH_PATH" == "/" ]]; then
+        cmd="$cmd | grep -v '^/System/' | grep -v '^/Library/' | grep -v '^/private/' | grep -v '^/Volumes/' | grep -v '/Trash/'"
+    fi
+    if [[ "$SHOW_HIDDEN" == false ]]; then
+        cmd="$cmd | grep -v '/\\.'"
+    fi
+    echo "$cmd"
+}
+
+# ── Cache setup ───────────────────────────────────────────
+
+CACHE_DIR="$HOME/.cache/diskscout"
+mkdir -p "$CACHE_DIR" 2>/dev/null
+CACHE_KEY=$(echo "${SEARCH_PATH}|${MIN_BYTES}|${SHOW_HIDDEN}|${EXCLUDE_SYSTEM}" | md5)
+CACHE_FILE="${CACHE_DIR}/${CACHE_KEY}.cache"
 
 # ── Header ────────────────────────────────────────────────
 
@@ -343,23 +385,88 @@ if [[ "$FORMAT" == "table" ]]; then
     echo -e "${BOLD}  DiskScout${RESET} ${DIM}— Read-Only File Size Scanner${RESET}"
     echo -e "${DIM}  Searching: ${RESET}${SEARCH_PATH}"
     echo -e "${DIM}  Showing:   ${RESET}Top ${COUNT} largest files"
-    [[ -n "$MIN_SIZE" ]] && echo -e "${DIM}  Min size:  ${RESET}${MIN_SIZE}"
-    echo ""
-    echo -ne "${DIM}  Scanning...${RESET}"
+    if [[ -n "$MIN_SIZE" ]]; then
+        echo -e "${DIM}  Min size:  ${RESET}${MIN_SIZE}"
+    else
+        echo -e "${DIM}  Min size:  ${RESET}1 MB ${DIM}(use -m to change)${RESET}"
+    fi
 fi
 
-# ── Scan: find + stat (size, mod_time, path) ──────────────
+# ── Scan (with cache) ─────────────────────────────────────
 
 TMPFILE=$(mktemp)
 trap "rm -f $TMPFILE" EXIT
+SCAN_METHOD=""
+SCAN_TIME=0
+CACHE_USED=false
 
-find "${FIND_ARGS[@]}" -print0 2>/dev/null | \
-    xargs -0 stat -f '%z %m %N' 2>/dev/null | \
-    sort -rn | \
-    head -n "$COUNT" > "$TMPFILE"
+# Check cache first
+if [[ "$FORCE_SCAN" == false ]] && [[ -f "$CACHE_FILE" ]]; then
+    CACHE_MOD=$(stat -f '%m' "$CACHE_FILE")
+    NOW=$(date +%s)
+    CACHE_AGE=$(( NOW - CACHE_MOD ))
+    if (( CACHE_AGE < CACHE_MAX_AGE )); then
+        head -n "$COUNT" "$CACHE_FILE" > "$TMPFILE"
+        CACHE_USED=true
+        CACHE_MINS=$(( CACHE_AGE / 60 ))
+        if (( CACHE_MINS == 0 )); then
+            SCAN_METHOD="cache (<1min old)"
+        else
+            SCAN_METHOD="cache (${CACHE_MINS}min old)"
+        fi
+    fi
+fi
+
+# Scan if no usable cache
+if [[ "$CACHE_USED" == false ]]; then
+    if [[ "$FORMAT" == "table" ]]; then
+        echo ""
+        echo -ne "${DIM}  Scanning...${RESET}"
+    fi
+
+    SCAN_START=$(date +%s)
+    SCAN_STORE=$(mktemp)
+
+    # Fast path: Spotlight index (mdfind)
+    if command -v mdfind &>/dev/null; then
+        FILTER_CMD=$(build_grep_filters)
+
+        eval "mdfind 'kMDItemFSSize > ${MIN_BYTES}' -onlyin '${SEARCH_PATH}' 2>/dev/null | ${FILTER_CMD}" | \
+            tr '\n' '\0' | \
+            xargs -0 stat -f '%z %m %N' 2>/dev/null | \
+            sort -rn | \
+            head -n 500 > "$SCAN_STORE"
+
+        if [[ -s "$SCAN_STORE" ]]; then
+            SCAN_METHOD="Spotlight"
+        fi
+    fi
+
+    # Fallback: filesystem walk with size pre-filter
+    if [[ -z "$SCAN_METHOD" ]]; then
+        find "${FIND_ARGS[@]}" -print0 2>/dev/null | \
+            xargs -0 stat -f '%z %m %N' 2>/dev/null | \
+            sort -rn | \
+            head -n 500 > "$SCAN_STORE"
+        SCAN_METHOD="filesystem"
+    fi
+
+    SCAN_END=$(date +%s)
+    SCAN_TIME=$(( SCAN_END - SCAN_START ))
+
+    # Save to cache and extract requested count
+    cp "$SCAN_STORE" "$CACHE_FILE" 2>/dev/null
+    head -n "$COUNT" "$SCAN_STORE" > "$TMPFILE"
+    rm -f "$SCAN_STORE"
+fi
 
 if [[ "$FORMAT" == "table" ]]; then
-    echo -e "\r${DIM}  Scan complete.                    ${RESET}"
+    if [[ "$CACHE_USED" == true ]]; then
+        echo ""
+        echo -e "${DIM}  Instant (${SCAN_METHOD}). Use ${RESET}${BOLD}-f${RESET}${DIM} to force fresh scan.${RESET}"
+    else
+        echo -e "\r${DIM}  Done in ${SCAN_TIME}s (${SCAN_METHOD}). Next run will be instant.${RESET}"
+    fi
     echo ""
     echo -e "  ${DIM}LEGEND:${RESET}  ${BGREEN}${APPLE} KEEP${RESET} = important, don't touch    ${RED}✂ CLEANUP${RESET} = safe to delete    ${YELLOW}💤 STALE${RESET} = unused 6+ months"
 fi
