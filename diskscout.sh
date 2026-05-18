@@ -658,7 +658,7 @@ if [[ "$FORMAT" == "table" ]]; then
                 echo -e "  ${GREEN}Revealing in Finder → $(friendly_dir "$(dirname "$target")")/${BOLD}$(basename "$target")${RESET}"
                 open -R "$target"
             else
-                echo -e "  ${RED}Enter a number between 1 and ${LINE_NUM}${RESET}"
+                echo -e "  ${RED}Invalid — type a result number from the list above (1-${LINE_NUM})${RESET}"
             fi
         done
     elif [[ "$OPEN_MODE" == false ]] && [[ $LINE_NUM -gt 0 ]]; then
