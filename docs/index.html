@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiskScout — Find the Largest Files on Your Mac</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface-2: #1a1a1a;
+      --border: #262626;
+      --border-light: #333;
+      --text: #e5e5e5;
+      --text-dim: #888;
+      --text-muted: #555;
+      --accent: #3b82f6;
+      --accent-dim: #1e3a5f;
+      --green: #22c55e;
+      --green-dim: #14532d;
+      --red: #ef4444;
+      --red-dim: #450a0a;
+      --yellow: #eab308;
+      --yellow-dim: #422006;
+      --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Hero ─────────────────────────────── */
+
+    .hero {
+      padding: 80px 24px 60px;
+      text-align: center;
+      background: linear-gradient(180deg, #0f1729 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: clamp(40px, 6vw, 64px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span { color: var(--accent); }
+
+    .hero p {
+      font-size: 18px;
+      color: var(--text-dim);
+      max-width: 520px;
+      margin: 0 auto 32px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--border); }
+
+    /* ── Features ─────────────────────────── */
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+
+    .feature {
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+
+    .feature h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .feature p {
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ── Section layout ───────────────────── */
+
+    .section {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+
+    .section + .section { padding-top: 0; }
+
+    .section h2 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .section h2 .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 700;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    .section > p {
+      color: var(--text-dim);
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Terminal / code blocks ────────────── */
+
+    .terminal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .terminal-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .terminal-dots .dot-red { background: #ff5f57; }
+    .terminal-dots .dot-yellow { background: #febc2e; }
+    .terminal-dots .dot-green { background: #28c840; }
+
+    .terminal-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .terminal-body {
+      padding: 20px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text-dim);
+    }
+
+    .terminal-body .cmd { color: var(--text); }
+    .terminal-body .prompt { color: var(--green); }
+    .terminal-body .comment { color: var(--text-muted); }
+    .terminal-body .flag { color: var(--accent); }
+    .terminal-body .output { color: var(--text-muted); }
+    .terminal-body .highlight { color: var(--yellow); }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--border);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { background: var(--border-light); color: var(--text); }
+    .copy-btn.copied { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+
+    /* ── Legend / badge cards ──────────────── */
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .legend-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .legend-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+    }
+
+    .legend-icon.keep { background: var(--green-dim); color: var(--green); }
+    .legend-icon.cleanup { background: var(--red-dim); color: var(--red); }
+    .legend-icon.stale { background: var(--yellow-dim); color: var(--yellow); }
+
+    .legend-text h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .legend-text h4.keep-label { color: var(--green); }
+    .legend-text h4.cleanup-label { color: var(--red); }
+    .legend-text h4.stale-label { color: var(--yellow); }
+
+    .legend-text p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    /* ── Flags table ──────────────────────── */
+
+    .flags-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    .flags-table th {
+      text-align: left;
+      padding: 10px 16px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .flags-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .flags-table tr:last-child td { border-bottom: none; }
+
+    .flags-table code {
+      font-family: var(--mono);
+      font-size: 13px;
+      background: var(--surface-2);
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .flags-table .desc { color: var(--text-dim); }
+
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+
+    /* ── Example output block ─────────────── */
+
+    .example-output {
+      padding: 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .example-output .size-red { color: var(--red); font-weight: 600; }
+    .example-output .size-yellow { color: var(--yellow); font-weight: 600; }
+    .example-output .size-cyan { color: var(--accent); font-weight: 600; }
+    .example-output .badge-keep { color: var(--green); font-weight: 600; }
+    .example-output .badge-cleanup { color: var(--red); font-weight: 600; }
+    .example-output .badge-stale { color: var(--yellow); font-weight: 600; }
+    .example-output .file-name { color: #fff; font-weight: 600; }
+    .example-output .finder-path { color: var(--accent); }
+    .example-output .dim { color: var(--text-muted); }
+    .example-output .reason-keep { color: #166534; }
+    .example-output .reason-cleanup { color: #7f1d1d; }
+    .example-output .reason-stale { color: #713f12; }
+
+    /* ── Script block ─────────────────────── */
+
+    .script-block {
+      margin: 20px 0;
+    }
+
+    .script-block .terminal-body {
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--text-dim);
+    }
+
+    /* ── Footer ───────────────────────────── */
+
+    .footer {
+      text-align: center;
+      padding: 40px 24px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .footer a { color: var(--text-dim); }
+
+    /* ── Scrollbar ────────────────────────── */
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+    /* ── Quick-start paste box ────────────── */
+
+    .quickstart {
+      background: linear-gradient(135deg, var(--accent-dim), #1a0f2e);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      text-align: center;
+    }
+
+    .quickstart p {
+      font-size: 14px;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    .quickstart .paste-cmd {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 12px 16px;
+      max-width: 620px;
+      margin: 0 auto;
+    }
+
+    .quickstart .paste-cmd code {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+      text-align: left;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    /* ── Responsive ───────────────────────── */
+
+    @media (max-width: 600px) {
+      .hero { padding: 48px 20px 40px; }
+      .hero h1 { font-size: 32px; }
+      .features { grid-template-columns: 1fr; }
+      .legend { grid-template-columns: 1fr; }
+      .example-output { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════ HERO ═══════ -->
+  <section class="hero">
+    <div class="hero-badge">Free &middot; Open Source &middot; macOS</div>
+    <h1>Disk<span>Scout</span></h1>
+    <p>Find the largest files on your Mac. See what's safe to delete, what's important, and what you haven't touched in months.</p>
+    <div class="hero-actions">
+      <a href="#quickstart" class="btn btn-primary">Get Started</a>
+      <a href="#script" class="btn btn-secondary">View Script</a>
+    </div>
+  </section>
+
+  <!-- ═══════ FEATURES ═══════ -->
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">&#x1F6E1;&#xFE0F;</div>
+      <h3>100% Read-Only</h3>
+      <p>Never deletes, moves, or modifies your files. Scan with zero risk.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#x1F3F7;&#xFE0F;</div>
+      <h3>Smart Classification</h3>
+      <p>Automatically labels files as system-critical, safe to delete, or stale.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#x1F4C2;</div>
+      <h3>Finder Integration</h3>
+      <p>Shows the exact directory for every file. Open any result directly in Finder.</p>
+    </div>
+  </div>
+
+  <!-- ═══════ LEGEND ═══════ -->
+  <div class="section">
+    <h2>What the Labels Mean</h2>
+    <p>Every file gets classified so you know what you're looking at.</p>
+    <div class="legend">
+      <div class="legend-card">
+        <div class="legend-icon keep">&#xF8FF;</div>
+        <div class="legend-text">
+          <h4 class="keep-label"> KEEP</h4>
+          <p>System or app file. Deleting it could break your Mac or an app. Don't touch it.</p>
+        </div>
+      </div>
+      <div class="legend-card">
+        <div class="legend-icon cleanup">&#x2702;</div>
+        <div class="legend-text">
+          <h4 class="cleanup-label">&#x2702; CLEANUP</h4>
+          <p>Cache, build artifact, or temp file. Safe to delete &mdash; it will regenerate or can be reinstalled.</p>
+        </div>
+      </div>
+      <div class="legend-card">
+        <div class="legend-icon stale">&#x1F4A4;</div>
+        <div class="legend-text">
+          <h4 class="stale-label">&#x1F4A4; STALE</h4>
+          <p>Hasn't been modified in over 6 months. Review whether you still need it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ SAMPLE OUTPUT ═══════ -->
+  <div class="section">
+    <h2>Sample Output</h2>
+    <p>Here's what a real scan looks like in Terminal.</p>
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <span class="dot-red"></span>
+          <span class="dot-yellow"></span>
+          <span class="dot-green"></span>
+        </div>
+        <div class="terminal-title">Terminal &mdash; diskscout -n 5 -m 500M -o</div>
+      </div>
+      <div class="example-output">
+<span class="dim">  DiskScout</span> <span class="dim">&mdash; Read-Only File Size Scanner</span>
+<span class="dim">  Searching: /Users/you</span>
+<span class="dim">  Showing:   Top 5 largest files</span>
+
+  <span class="dim">#1</span>   <span class="size-red">  25.0 GB</span>  <span class="badge-cleanup">&#x2702; CLEANUP</span>       <span class="file-name">store</span>
+                          <span class="dim">Finder:</span> <span class="finder-path">~/.app-cache/instance/cache</span>
+                          <span class="reason-cleanup">&#8627; App cache &mdash; regenerates automatically</span>
+
+  <span class="dim">#2</span>   <span class="size-red">   5.7 GB</span>  <span class="dim">&mdash;&mdash;</span>                <span class="file-name">SAVIOR COMPLEX FINAL.mov</span>
+                          <span class="dim">Finder:</span> <span class="finder-path">~/Desktop</span>
+
+  <span class="dim">#3</span>   <span class="size-red">   3.1 GB</span>  <span class="badge-keep">&#xF8FF; KEEP</span>          <span class="file-name">sharedassets0.assets.resS</span>
+                          <span class="dim">Finder:</span> <span class="finder-path">~/Library/Application Support/Steam/steamapps/common/Game/App.app/...</span>
+                          <span class="reason-keep">&#8627; Part of App.app &mdash; needed for the app to work</span>
+
+  <span class="dim">#4</span>   <span class="size-yellow"> 850.1 MB</span>  <span class="badge-stale">&#x1F4A4; STALE 8yr</span>    <span class="file-name">Studio Cellos.caf</span>
+                          <span class="dim">Finder:</span> <span class="finder-path">~/Music/Logic/OldProject.logicx/Media/Samples</span>
+                          <span class="reason-stale">&#8627; Last modified 8yr ago &mdash; review if still needed</span>
+
+  <span class="dim">#5</span>   <span class="size-yellow"> 768.2 MB</span>  <span class="badge-stale">&#x1F4A4; STALE 8yr</span>    <span class="file-name">Studio Violas.caf</span>
+                          <span class="dim">Finder:</span> <span class="finder-path">~/Music/Logic/OldProject.logicx/Media/Samples</span>
+                          <span class="reason-stale">&#8627; Last modified 8yr ago &mdash; review if still needed</span>
+
+  <span class="dim">&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;</span>
+  <span class="file-name">SUMMARY</span>
+  <span class="badge-keep">&#xF8FF; KEEP</span>       1 file     <span class="file-name">  3.1 GB</span>   <span class="dim">Do not delete</span>
+  <span class="badge-cleanup">&#x2702; CLEANUP</span>    1 file     <span class="file-name"> 25.0 GB</span>   <span class="dim">Safe to delete</span>
+  <span class="badge-stale">&#x1F4A4; STALE</span>     2 files    <span class="file-name">  1.6 GB</span>   <span class="dim">Unused 6+ months</span>
+  <span class="dim">&#x2500;&#x2500; OTHER</span>     1 file     <span class="file-name">  5.7 GB</span>   <span class="dim">Recently used</span>
+
+  <span class="file-name">Potential savings: 26.6 GB</span> <span class="dim">(cleanup + stale)</span>
+  <span style="color: var(--green);">&#x2713; Read-only scan complete. No files were modified or deleted.</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════ QUICK START ═══════ -->
+  <div class="section" id="quickstart">
+    <h2><span class="step-num">1</span> Quick Start &mdash; Paste &amp; Run</h2>
+    <p>Open <strong>Terminal</strong> (search "Terminal" in Spotlight or find it in Applications &rarr; Utilities) and paste this command:</p>
+
+    <div class="quickstart">
+      <p>This downloads the script, makes it runnable, and scans your Mac.</p>
+      <div class="paste-cmd">
+        <code id="quickstart-cmd">curl -sL https://raw.githubusercontent.com/johnrosment/diskscout/main/diskscout.sh -o /tmp/diskscout.sh && chmod +x /tmp/diskscout.sh && /tmp/diskscout.sh -n 30 -o</code>
+        <button class="copy-btn" data-target="quickstart-cmd" onclick="copyText(this)">Copy</button>
+      </div>
+    </div>
+
+    <p style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">Or keep reading below to install it permanently or copy the script directly.</p>
+  </div>
+
+  <!-- ═══════ INSTALL PERMANENTLY ═══════ -->
+  <div class="section">
+    <h2><span class="step-num">2</span> Install Permanently (Optional)</h2>
+    <p>To use <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">diskscout</code> as a command from anywhere on your Mac:</p>
+
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <span class="dot-red"></span>
+          <span class="dot-yellow"></span>
+          <span class="dot-green"></span>
+        </div>
+        <div class="terminal-title">Terminal</div>
+        <button class="copy-btn" data-target="install-cmd" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="terminal-body" id="install-cmd"><span class="comment"># Create the directory if it doesn't exist</span>
+<span class="prompt">$</span> <span class="cmd">sudo mkdir -p /usr/local/bin</span>
+
+<span class="comment"># Download the script</span>
+<span class="prompt">$</span> <span class="cmd">sudo curl -sL https://raw.githubusercontent.com/johnrosment/diskscout/main/diskscout.sh -o /usr/local/bin/diskscout</span>
+
+<span class="comment"># Make it executable</span>
+<span class="prompt">$</span> <span class="cmd">sudo chmod +x /usr/local/bin/diskscout</span>
+
+<span class="comment"># Now run it from anywhere:</span>
+<span class="prompt">$</span> <span class="cmd">diskscout</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════ USAGE ═══════ -->
+  <div class="section">
+    <h2><span class="step-num">3</span> Usage &amp; Examples</h2>
+    <p>Run with different flags to customize your scan.</p>
+
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <span class="dot-red"></span>
+          <span class="dot-yellow"></span>
+          <span class="dot-green"></span>
+        </div>
+        <div class="terminal-title">Terminal</div>
+      </div>
+      <div class="terminal-body"><span class="comment"># Top 50 largest files (default)</span>
+<span class="prompt">$</span> <span class="cmd">diskscout</span>
+
+<span class="comment"># Top 20 largest, then pick any to open in Finder</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-n 20 -o</span></span>
+
+<span class="comment"># Only scan your Downloads folder</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-p ~/Downloads</span></span>
+
+<span class="comment"># Only show files over 1 GB</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-m 1G</span></span>
+
+<span class="comment"># Scan your home folder, include hidden files</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-p ~ -a</span></span>
+
+<span class="comment"># Include system directories too</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-s</span></span>
+
+<span class="comment"># Export to CSV for a spreadsheet</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-c</span> &gt; big-files.csv</span>
+
+<span class="comment"># Combine: top 30 over 500MB, reveal in Finder</span>
+<span class="prompt">$</span> <span class="cmd">diskscout <span class="flag">-n 30 -m 500M -o</span></span></div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="flags-table">
+        <thead>
+          <tr><th>Flag</th><th>What It Does</th><th>Default</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-n NUM</code></td><td class="desc">Number of results to show</td><td class="desc">50</td></tr>
+          <tr><td><code>-p PATH</code></td><td class="desc">Directory to search</td><td class="desc">/</td></tr>
+          <tr><td><code>-m SIZE</code></td><td class="desc">Minimum file size (<code>100M</code>, <code>1G</code>, etc.)</td><td class="desc">None</td></tr>
+          <tr><td><code>-o</code></td><td class="desc">After scan, pick any result to reveal in Finder</td><td class="desc">Off</td></tr>
+          <tr><td><code>-a</code></td><td class="desc">Include hidden / dotfiles</td><td class="desc">Off</td></tr>
+          <tr><td><code>-s</code></td><td class="desc">Include system directories (/System, /Library)</td><td class="desc">Off</td></tr>
+          <tr><td><code>-c</code></td><td class="desc">Output as CSV (pipe to a file)</td><td class="desc">Off</td></tr>
+          <tr><td><code>-h</code></td><td class="desc">Show help</td><td class="desc">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════ FULL SCRIPT ═══════ -->
+  <div class="section" id="script">
+    <h2>Full Script</h2>
+    <p>Want to save it manually? Copy the entire script below, paste it into a file, and <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">chmod +x</code> it.</p>
+
+    <div class="terminal script-block">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <span class="dot-red"></span>
+          <span class="dot-yellow"></span>
+          <span class="dot-green"></span>
+        </div>
+        <div class="terminal-title">diskscout.sh</div>
+        <button class="copy-btn" data-target="full-script" onclick="copyText(this)">Copy Script</button>
+      </div>
+      <div class="terminal-body" id="full-script">#!/bin/bash
+# DiskScout &mdash; Find the largest files on your Mac
+# READ-ONLY: This script NEVER deletes, moves, or modifies any files.
+
+set -uo pipefail
+
+COUNT=50
+MIN_SIZE=""
+SEARCH_PATH="/"
+FORMAT="table"
+SHOW_HIDDEN=false
+EXCLUDE_SYSTEM=true
+OPEN_MODE=false
+
+usage() {
+    cat &lt;&lt;'HELP'
+DiskScout &mdash; Find the largest files on your Mac
+
+Usage: diskscout.sh [OPTIONS]
+
+Options:
+  -n NUM        Number of files to show (default: 50)
+  -p PATH       Directory to search (default: / )
+  -m SIZE       Minimum file size filter: 100M, 1G, etc.
+  -a            Include hidden/dot files
+  -s            Include system directories (/System, /Library, etc.)
+  -c            Output as CSV instead of table
+  -o            After results, prompt to reveal any file in Finder
+  -h            Show this help
+
+READ-ONLY &mdash; will NEVER delete, move, or modify any files.
+HELP
+    exit 0
+}
+
+while getopts "n:p:m:ascoh" opt; do
+    case $opt in
+        n) COUNT="$OPTARG" ;;
+        p) SEARCH_PATH="$OPTARG" ;;
+        m) MIN_SIZE="$OPTARG" ;;
+        a) SHOW_HIDDEN=true ;;
+        s) EXCLUDE_SYSTEM=false ;;
+        c) FORMAT="csv" ;;
+        o) OPEN_MODE=true ;;
+        h) usage ;;
+        *) usage ;;
+    esac
+done
+
+APPLE=$(printf '\xEF\xA3\xBF')
+
+if [[ "$FORMAT" == "table" ]] &amp;&amp; [[ -t 1 ]]; then
+    BOLD="\033[1m"; DIM="\033[2m"; CYAN="\033[36m"
+    YELLOW="\033[33m"; RED="\033[31m"; GREEN="\033[32m"
+    BGREEN="\033[92m"; WHITE="\033[97m"; RESET="\033[0m"
+else
+    BOLD="" DIM="" CYAN="" YELLOW="" RED="" GREEN=""
+    BGREEN="" WHITE="" RESET="" APPLE=""
+fi
+
+SIX_MONTHS_AGO=$(date -v-6m +%s 2&gt;/dev/null || echo 0)
+
+human_size() {
+    local bytes=$1
+    if (( bytes &gt;= 1073741824 )); then
+        printf "%.1f GB" "$(echo "scale=1; $bytes / 1073741824" | bc)"
+    elif (( bytes &gt;= 1048576 )); then
+        printf "%.1f MB" "$(echo "scale=1; $bytes / 1048576" | bc)"
+    elif (( bytes &gt;= 1024 )); then
+        printf "%.1f KB" "$(echo "scale=1; $bytes / 1024" | bc)"
+    else
+        printf "%d B" "$bytes"
+    fi
+}
+
+# ... (full classify, time_ago, display logic)
+# Copy from the button above or download via curl</div>
+    </div>
+
+    <p style="margin-top: 12px; color: var(--text-dim); font-size: 14px;">
+      The copy button above copies a working summary. For the complete script with all features, use the <strong>Quick Start</strong> curl command or the install steps &mdash; those pull the full version.
+    </p>
+  </div>
+
+  <!-- ═══════ FAQ ═══════ -->
+  <div class="section">
+    <h2>FAQ</h2>
+
+    <div style="margin: 20px 0;">
+      <h3 style="font-size: 15px; margin-bottom: 4px;">Will this delete my files?</h3>
+      <p style="font-size: 14px; color: var(--text-dim);">No. DiskScout is 100% read-only. It will never delete, move, or modify any file on your system. It only reads file sizes and paths.</p>
+    </div>
+
+    <div style="margin: 20px 0;">
+      <h3 style="font-size: 15px; margin-bottom: 4px;">Why does the scan take a while?</h3>
+      <p style="font-size: 14px; color: var(--text-dim);">Scanning your entire drive means walking every file. Use <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">-p ~/Downloads</code> to scan a specific folder, or <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">-m 500M</code> to skip small files.</p>
+    </div>
+
+    <div style="margin: 20px 0;">
+      <h3 style="font-size: 15px; margin-bottom: 4px;">What does "stale" mean?</h3>
+      <p style="font-size: 14px; color: var(--text-dim);">A file marked stale hasn't been modified in 6+ months. It might still be important &mdash; it's just a heads-up to review it.</p>
+    </div>
+
+    <div style="margin: 20px 0;">
+      <h3 style="font-size: 15px; margin-bottom: 4px;">How do I open a file's location in Finder?</h3>
+      <p style="font-size: 14px; color: var(--text-dim);">Run with the <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">-o</code> flag. After the scan, type a result number and it opens that file's folder in Finder with the file highlighted.</p>
+    </div>
+
+    <div style="margin: 20px 0;">
+      <h3 style="font-size: 15px; margin-bottom: 4px;">I get "permission denied" errors.</h3>
+      <p style="font-size: 14px; color: var(--text-dim);">Some system folders require elevated access. The script skips them by default. If you want a full scan including system dirs, run with <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">-s</code> and prefix with <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">sudo</code>.</p>
+    </div>
+  </div>
+
+  <!-- ═══════ FOOTER ═══════ -->
+  <footer class="footer">
+    <p>DiskScout is free and open source. No data leaves your Mac.</p>
+  </footer>
+
+  <!-- ═══════ SCRIPTS ═══════ -->
+  <script>
+    function copyText(btn) {
+      const targetId = btn.getAttribute('data-target');
+      const el = document.getElementById(targetId);
+      let text = el.textContent || el.innerText;
+
+      // For terminal blocks, strip prompt symbols and keep just commands
+      if (targetId === 'install-cmd') {
+        text = text.split('\n')
+          .filter(line => line.trim().startsWith('$'))
+          .map(line => line.replace(/^\s*\$\s*/, ''))
+          .join('\n');
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+  </script>
+
+</body>
+</html>
