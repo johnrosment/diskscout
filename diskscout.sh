@@ -6,7 +6,7 @@ set -uo pipefail
 
 COUNT=50
 MIN_SIZE=""
-SEARCH_PATH="/"
+SEARCH_PATH="$HOME"
 FORMAT="table"
 SHOW_HIDDEN=false
 EXCLUDE_SYSTEM=true
@@ -22,7 +22,7 @@ Usage: diskscout.sh [OPTIONS]
 
 Options:
   -n NUM        Number of files to show (default: 50)
-  -p PATH       Directory to search (default: / )
+  -p PATH       Directory to search (default: ~ home folder)
   -m SIZE       Minimum file size filter (default: 1M). Use 100M, 1G, etc.
   -a            Include hidden/dot files
   -s            Include system directories (/System, /Library, etc.)
@@ -32,8 +32,9 @@ Options:
   -h            Show this help
 
 Examples:
-  diskscout.sh                     # Top 50 largest files (cached after first run)
+  diskscout.sh                     # Top 50 largest files in home folder
   diskscout.sh -n 20 -o            # Top 20, then reveal any in Finder
+  diskscout.sh -p /                # Scan entire disk (slower)
   diskscout.sh -p ~/Downloads      # Scan just Downloads
   diskscout.sh -m 1G               # Only files >= 1GB
   diskscout.sh -f                  # Force fresh scan, skip cache
@@ -419,13 +420,25 @@ fi
 
 # Scan if no usable cache
 if [[ "$CACHE_USED" == false ]]; then
-    if [[ "$FORMAT" == "table" ]]; then
-        echo ""
-        echo -ne "${DIM}  Scanning...${RESET}"
-    fi
-
     SCAN_START=$(date +%s)
     SCAN_STORE=$(mktemp)
+
+    # Spinner runs in background during scan
+    spinner_pid=""
+    if [[ "$FORMAT" == "table" ]] && [[ -t 1 ]]; then
+        echo ""
+        (
+            chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+            i=0
+            while true; do
+                elapsed=$(( $(date +%s) - SCAN_START ))
+                printf "\r${DIM}  %s Scanning... %ds elapsed${RESET}  " "${chars:i%10:1}" "$elapsed"
+                sleep 0.2
+                i=$((i+1))
+            done
+        ) &
+        spinner_pid=$!
+    fi
 
     # Fast path: Spotlight index (mdfind)
     if command -v mdfind &>/dev/null; then
@@ -449,6 +462,13 @@ if [[ "$CACHE_USED" == false ]]; then
             sort -rn | \
             head -n 500 > "$SCAN_STORE"
         SCAN_METHOD="filesystem"
+    fi
+
+    # Stop spinner
+    if [[ -n "$spinner_pid" ]]; then
+        kill "$spinner_pid" 2>/dev/null
+        wait "$spinner_pid" 2>/dev/null
+        printf "\r                                          \r"
     fi
 
     SCAN_END=$(date +%s)
