@@ -680,7 +680,17 @@
   <!-- ═══════ FULL SCRIPT ═══════ -->
   <div class="section" id="script">
     <h2>Full Script</h2>
-    <p>Want to save it manually? Copy the entire script below, paste it into a file, and <code style="font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">chmod +x</code> it.</p>
+    <p>Copy the one-liner below and paste it into Terminal. It saves the script to your Mac and runs it.</p>
+
+    <div class="quickstart" style="margin-bottom: 24px;">
+      <p style="font-size: 13px; color: var(--yellow); font-weight: 600; margin-bottom: 8px;">Paste this into Terminal &mdash; do NOT paste the raw script code below.</p>
+      <div class="paste-cmd">
+        <code id="save-and-run-cmd">curl -sL https://raw.githubusercontent.com/johnrosment/diskscout/main/diskscout.sh -o ~/diskscout.sh && chmod +x ~/diskscout.sh && ~/diskscout.sh -n 30 -o</code>
+        <button class="copy-btn" data-target="save-and-run-cmd" onclick="copyText(this)">Copy</button>
+      </div>
+    </div>
+
+    <p style="color: var(--text-dim); font-size: 14px; margin-bottom: 12px;">Full source code for reference:</p>
 
     <div class="terminal script-block">
       <div class="terminal-header">
@@ -690,7 +700,6 @@
           <span class="dot-green"></span>
         </div>
         <div class="terminal-title">diskscout.sh</div>
-        <button class="copy-btn" data-target="full-script-raw" onclick="copyText(this)">Copy Script</button>
       </div>
       <div class="terminal-body" id="full-script-display"></div>
     </div>
